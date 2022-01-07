@@ -1,4 +1,5 @@
 library( tidyverse)
+library( doParallel)
 
 wordle_solution <- str_split(sort(readLines( "wordle_solution.csv")), "" )
 wordle_valid    <- str_split(sort(readLines( "wordle_valid.csv")), "")
@@ -60,7 +61,6 @@ filter_solutions1st <- function( guess, solution )
 # length( possible_solutions)
 # possible_solutions
 # 
-
 # guess <- c( "l","u","n","c","h")
 # game_state <- update_state( game_state, guess, solution )
 # game_state
@@ -79,17 +79,35 @@ possible_solutions <- wordle_solution
 possible_guesses   <- wordle_solution
 
 
-# 
 # 1 / 2315 a  b  a  c  k = 451.6238 ( 31186 minutes to completion)
 # 2 / 2315 a  b  a  s  e = 176.1248 ( 22020 minutes to completion)
 # 3 / 2315 a  b  a  t  e = 170.3071 ( 18925 minutes to completion)
 # 4 / 2315 a  b  b  e  y = 239.362 ( 18119 minutes to completion)
 
 
-
 ll <- matrix( 0, nrow = length( possible_guesses), ncol = length( possible_solutions) )
 st <- Sys.time()
 cat( format(st), "\n")
+
+
+cl <- makeCluster(8)
+clusterExport(cl, c("n")) # Export max number of iteration to workers
+registerDoParallel(cl)
+  
+
+ll <- foreach( idx = 1:length(possible_guesses), .combine = rbind, .packages = c("tidyverse","tcltk" )) %dopar%
+{
+  if(!exists("pb")) pb <- tkProgressBar("Parallel task", min=1, max=n)
+  setTkProgressBar(pb, idx)
+  
+  #cat( idx, "/", length( possible_guesses), paste(  possible_guesses[[idx]], collpase=""))
+  map( possible_solutions, ~ length( filter_solutions1st( possible_guesses[[idx]], .)))
+  #  ll[idx,] <- map_dbl( possible_solutions, ~ length( filter_solutions_slow( possible_solutions, update_state( game_state, possible_guesses[[idx]], . ))))
+}
+
+
+stopCluster(cl)
+
 for( idx in 1:length(possible_guesses))
 {
   cat( idx, "/", length( possible_guesses), paste(  possible_guesses[[idx]], collpase=""))
