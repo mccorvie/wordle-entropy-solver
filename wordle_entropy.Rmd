@@ -1,0 +1,189 @@
+---
+title: "wordle entropy"
+author: "Ryan McCorvie"
+date: `r today()`
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library( tidyverse)
+library( doParallel)
+
+
+```
+
+
+[solution 1](https://twitter.com/mjskay/status/1479702900012167170)
+
+[solution 2](https://twitter.com/LaurentLessard/status/1479981744837308422)
+
+
+```{r best first}
+
+
+first_guesses <- tibble( 
+  words = c( "raise", "slate","crate", "irate", "trace", "arise", "stare","snare","arose", "least", 
+   "alert", "crane", "stale", "saner", "alter", "later", "react", "leant", "learn", "cater" ),
+  information = c( 5.877910, 5.855775, 5.834874, 5.831397, 5.830549, 5.820940, 5.807280, 5.770089, 5.767797, 5.751646,
+ 5.745837, 5.742782, 5.738573, 5.733713, 5.713171, 5.706089, 5.696354, 5.684574, 5.656074, 5.646715 )
+)
+
+first_guesses
+```
+
+
+
+```{r wordle functions}
+
+```
+
+
+
+```{r guess analysis}
+
+guess_log    <- c( "raise","cleat","abide")
+feedback_log <- c( "bybby", "bbyyb", "ggbby")
+
+guess_log <- c( "raise", "count")
+feedback_log <- c( "bgbbb", "bbbyy")
+
+guess_log <- c( "stare", "login" )
+feedback_log <- c( "bbybb", "bbbgy" )
+
+guess_log = c("ready", "spout", "might" )
+feedback_log= c( "bbybb", "bybbb", "bybbb" )
+
+
+
+game_state = game_state_from_feedback( guess_log, feedback_log )
+
+possible_solutions <- wordle_solution
+possible_guesses <- wordle_solution
+#game_state <- list( black = black, in_solution = in_solution,yellow=yellow, green=green)
+
+possible_solutions <- filter_solutions_slow( possible_solutions, game_state )
+unlist(map( possible_solutions, ~ paste0(.,collapse="")))
+
+
+st = Sys.time()
+ll <- NULL
+for( idx in 1:length(possible_guesses))
+{
+  cat( idx, "/", length( possible_guesses), paste0(  possible_guesses[[idx]], collapse=""), " " )
+#  ll <- rbind( ll, map_dbl( possible_solutions, ~ length( filter_solutions1st( possible_guesses[[idx]], . ))))
+  ll <- rbind( ll, map_dbl( possible_solutions, ~ length( filter_solutions_slow( possible_solutions, update_state( game_state, possible_guesses[[idx]], . )))))
+  
+  information_gain = log2( length( possible_solutions )) - mean( log2( ll[nrow(ll),]))
+  time_left = difftime( Sys.time(), st, units="mins") /idx * ( length(possible_guesses)-idx)
+  cat(  "=", information_gain, "(", round( time_left ), "minutes to completion)\n" )
+}
+
+     
+entropy_table = tibble( 
+  possible_guesses = unlist(map( possible_guesses, ~ paste0(.,collapse=""))), 
+  information_score = log2( length( possible_solutions )) - apply( log2( ll), 1, mean )
+)
+
+
+head( arrange( entropy_table, -information_score))
+possible_solutions
+
+ggplot( entropy_table, aes( x=information_score))+
+  geom_density(fill = "darkgreen", alpha=0.4)
+
+filter( entropy_table, possible_guesses=="chump")
+
+```
+
+
+
+
+
+
+
+```{r first word search}
+
+
+for( idx in 1:length(possible_guesses))
+{
+  cat( idx, "/", length( possible_guesses), paste(  possible_guesses[[idx]], collpase=""))
+  ll[idx,] <- map_dbl( possible_solutions, ~ length( filter_solutions1st( possible_guesses[[idx]], . )))
+#  ll[idx,] <- map_dbl( possible_solutions, ~ length( filter_solutions_slow( possible_solutions, update_state( game_state, possible_guesses[[idx]], . ))))
+  cat(  "=",mean( ll[idx,]), "(", round( as.numeric(Sys.time()-st)/idx * ( length(possible_guesses)-idx) ), "minutes to completion)\n" )
+}
+
+
+
+```
+
+
+
+```{r parallel first word search}
+
+
+
+game_state <- list( black = NULL, in_solution = NULL, yellow = rep( "", 5), green = rep( "", 5))
+possible_solutions <- wordle_solution
+possible_guesses   <- wordle_solution
+
+ll <- matrix( 0, nrow = length( possible_guesses), ncol = length( possible_solutions) )
+st <- Sys.time()
+cat( format(st), "\n")
+
+cl <- makeCluster(8)
+clusterExport(cl, c("n")) # Export max number of iteration to workers
+registerDoParallel(cl)
+  
+
+ll <- foreach( idx = 1:length(possible_guesses), .combine = rbind, .packages = c("tidyverse","tcltk" )) %dopar%
+{
+  if(!exists("pb")) pb <- tkProgressBar("Parallel task", min=1, max=n)
+  setTkProgressBar(pb, idx)
+  
+  #cat( idx, "/", length( possible_guesses), paste(  possible_guesses[[idx]], collpase=""))
+  map( possible_solutions, ~ length( filter_solutions1st( possible_guesses[[idx]], .)))
+  #  ll[idx,] <- map_dbl( possible_solutions, ~ length( filter_solutions_slow( possible_solutions, update_state( game_state, possible_guesses[[idx]], . ))))
+}
+
+
+
+```
+
+
+
+
+```{r known solution game play}
+
+
+solution <- c( "s", "l", "u", "m", "p")
+game_state <- list( black = NULL, in_solution = NULL, yellow = rep( "", 5), green = rep( "", 5))
+possible_solutions <- wordle_solution
+
+guess <- c( "a","e","r","o","s")
+game_state <- update_state( game_state, guess, solution )
+game_state
+possible_solutions <- filter_solutions2(  game_state )
+length( possible_solutions)
+
+guess <- c( "s", "p", "i", "l", "t" )
+game_state <- update_state( game_state, guess, solution )
+game_state
+possible_solutions <- filter_solutions2( game_state )
+length( possible_solutions)
+possible_solutions
+
+guess <- c( "l","u","n","c","h")
+game_state <- update_state( game_state, guess, solution )
+game_state
+possible_solutions <- filter_solutions( possible_solutions, game_state )
+length( possible_solutions)
+
+guess <- c( "m","i","s","t","y")
+game_state <- update_state( game_state, guess, solution )
+possible_solutions <- filter_solutions( possible_solutions, game_state )
+length( possible_solutions)
+game_state
+
+```
