@@ -72,7 +72,7 @@ ll <- NULL
 for( idx in 1:length(possible_guesses))
 {
   cat( idx, "/", length( possible_guesses), paste0(  possible_guesses[[idx]], collapse=""), " " )
-#  ll <- rbind( ll, map_dbl( possible_solutions, ~ length( filter_solutions1st( possible_guesses[[idx]], . ))))
+
   ll <- rbind( ll, map_dbl( possible_solutions, ~ length( filter_solutions_slow( possible_solutions, update_state( game_state, possible_guesses[[idx]], . )))))
   
   information_gain = log2( length( possible_solutions )) - mean( log2( ll[nrow(ll),]))
@@ -105,15 +105,27 @@ filter( entropy_table, possible_guesses=="chump")
 
 ```{r first word search}
 
+  
+possible_guesses = list( c( "a","s","t","e","r"))
+possible_solutions <- wordle_solution
 
+
+st = Sys.time()
+ll <- NULL
 for( idx in 1:length(possible_guesses))
 {
-  cat( idx, "/", length( possible_guesses), paste(  possible_guesses[[idx]], collpase=""))
-  ll[idx,] <- map_dbl( possible_solutions, ~ length( filter_solutions1st( possible_guesses[[idx]], . )))
-#  ll[idx,] <- map_dbl( possible_solutions, ~ length( filter_solutions_slow( possible_solutions, update_state( game_state, possible_guesses[[idx]], . ))))
-  cat(  "=",mean( ll[idx,]), "(", round( as.numeric(Sys.time()-st)/idx * ( length(possible_guesses)-idx) ), "minutes to completion)\n" )
+  cat( idx, "/", length( possible_guesses), paste0(  possible_guesses[[idx]], collapse=""), " " )
+  ll <- rbind( ll, map_dbl( possible_solutions, ~ length( filter_solutions1st( possible_guesses[[idx]], . ))))
+  information_gain = log2( length( possible_solutions )) - mean( log2( ll[nrow(ll),]))
+  time_left = difftime( Sys.time(), st, units="mins") /idx * ( length(possible_guesses)-idx)
+  cat(  "=", information_gain, "(", round( time_left ), "minutes to completion)\n" )
 }
 
+     
+entropy_table = tibble( 
+  possible_guesses = unlist(map( possible_guesses, ~ paste0(.,collapse=""))), 
+  information_score = log2( length( possible_solutions )) - apply( log2( ll), 1, mean )
+)
 
 
 ```
@@ -121,7 +133,6 @@ for( idx in 1:length(possible_guesses))
 
 
 ```{r parallel first word search}
-
 
 
 game_state <- list( black = NULL, in_solution = NULL, yellow = rep( "", 5), green = rep( "", 5))
