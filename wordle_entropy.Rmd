@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library( tidyverse)
 library( doParallel)
-
+source( "wordle_entropy.R")
 
 ```
 
@@ -31,12 +31,6 @@ first_guesses <- tibble(
 )
 
 first_guesses
-```
-
-
-
-```{r wordle functions}
-
 ```
 
 
